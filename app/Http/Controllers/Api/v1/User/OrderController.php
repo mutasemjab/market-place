@@ -6,217 +6,422 @@ use App\Http\Controllers\Controller;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Models\UserCoupon;
-use App\Models\Product;
-use App\Models\Variation;
-use App\Models\Address;
 use Illuminate\Http\Request;
-use App\Http\Resources\OrderResource;
-use App\Models\Setting;
 use App\Models\UserAddress;
-use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Models\OrderProduct;
+use App\Models\Shop;
+
+
 class OrderController extends Controller
 {
-
-        public function index()
+    /**
+     * Display a listing of user's orders
+     */
+    public function index()
     {
-        $user_id = auth()->user()->id;
-
+        $user = auth()->user();
+        
         $orders = Order::with([
-            'orderProducts' => function ($query) {
-                $query->with([
-                    'product' => function ($query) {
-                        $query->with(['category', 'productImages', 'category.countries']);
-                    },
-                    'unit' => function ($query) {
-                        $query->select('id', 'name_en', 'name_ar', 'name_fr'); // Include locale fields
-                    },
-                    'variation' => function ($query) {
-                        $query->select('id', 'product_id', 'variation');
-                    }
-                ]);
-            },
+            'shop',
             'address',
-            'user',
-            'shop'
-        ])->where('user_id', $user_id)->get();
+            'orderProducts' => function($query) {
+                $query->with(['product.photos', 'variation']);
+            }
+        ])
+        ->where('user_id', $user->id)
+        ->orderBy('created_at', 'desc')
+        ->paginate(10);
 
-        return response()->json(['data' => $orders]);
+        return response()->json([
+            'success' => true,
+            'data' => $orders->items(),
+            'pagination' => [
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'per_page' => $orders->perPage(),
+                'total' => $orders->total(),
+            ]
+        ], 200);
     }
 
-
-    
+    /**
+     * Store a newly created order from cart
+     */
     public function store(Request $request)
     {
-        // Get authenticated user's ID and user type
-        $user_id = auth()->user()->id;
-        $user_type = auth()->user()->user_type;
-    
-        // Validate the request data
         $request->validate([
-            'payment_type' => 'required',
             'address_id' => 'required|exists:user_addresses,id',
-            'shop_id' => 'required|exists:shops,id',
-            'note' => 'nullable',
-            'photo_note' => 'nullable',
+            'payment_type' => 'required|in:cash,card,wallet',
+            'note' => 'nullable|string|max:500',
+            'photo_note' => 'nullable|string', // base64 encoded image or file path
         ]);
-    
-        // Find all the cart items with status 1 for the current user
-        $cartItems = Cart::where('user_id', $user_id)->where('status', 1)->get();
-    
+
+        $user = auth()->user();
+
+        // Get user's cart items
+        $cartItems = Cart::with([
+            'product' => function($query) {
+                $query->with(['category.shop', 'offers']);
+            },
+            'variations',
+            'offer'
+        ])
+        ->where('user_id', $user->id)
+        ->where('status', 1)
+        ->get();
+
         if ($cartItems->isEmpty()) {
-            return response()->json(['message' => 'No items in the cart.'], 400);
+            return response()->json([
+                'success' => false,
+                'message' => 'Your cart is empty.'
+            ], 400);
         }
-    
-        // Start a transaction to ensure atomicity
-        DB::beginTransaction();
-    
+
+        // Validate address belongs to user
+        $address = UserAddress::where('id', $request->address_id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$address) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid address selected.'
+            ], 400);
+        }
+
+        // Get shop information from first cart item
+        $shopId = $cartItems->first()->shop_id;
+        $shop = Shop::find($shopId);
+
+        // Verify all cart items belong to the same shop
+        foreach ($cartItems as $item) {
+            if ($item->shop_id !== $shopId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'All cart items must belong to the same shop.'
+                ], 400);
+            }
+        }
+
         try {
-            // Initialize calculation variables
-            $total_discounts = 0;
-            $total_taxes = 0;
-            $total_prices = 0;
-            $totalPriceBeforeTaxSum = 0;
-    
-            // Get address and delivery fee
-            $address = UserAddress::with('delivery')->findOrFail($request->input('address_id'));
-            $delivery_fee = $address->delivery->price ?? 0;
-    
-            // Calculate totals from cart items
-            foreach ($cartItems as $cartItem) {
-                $total_discounts += $cartItem->discount_coupon ?? 0;
-                $total_taxes += $cartItem->product->tax ?? 0;
-                $total_prices += $cartItem->total_price_product;
-            }
-    
-            // Minimum order check based on user type
-            $min_order = Setting::first();
-            if (($user_type == 1 && $total_prices < $min_order->min_order) || ($user_type != 1 && $total_prices < $min_order->min_order_wholeSale)) {
-                $minOrderAmount = $user_type == 1 ? $min_order->min_order : $min_order->min_order_wholeSale;
-                DB::rollBack();
-                $response = response()->json(['message' => 'Your order is less than the minimum order. Please buy at least ' . $minOrderAmount], 404);
-                Log::info('Order Response', ['response' => $response->getContent()]);
-                return $response;
-            }
-    
-            // Generate the order number based on order type, ensuring uniqueness
-            $lastOrder = Order::where('order_type', 1)->orderBy('number', 'desc')->lockForUpdate()->first();
-            $newNumber = $lastOrder ? $lastOrder->number + 1 : 1;
-    
-            $lastOrderForRefund = Order::where('order_type', 2)->orderBy('number', 'desc')->lockForUpdate()->first();
-            $newNumberOfRefund = $lastOrderForRefund ? $lastOrderForRefund->number + 1 : 1;
-    
-            $orderNumber = $request->order_type == 2 ? $newNumberOfRefund : $newNumber;
-    
-            // Create a new order
-            $order = new Order([
+            DB::beginTransaction();
+
+            // Calculate order totals
+            $orderCalculation = $this->calculateOrderTotals($cartItems, $user->id);
+
+            // Generate order number
+            $orderNumber = $this->generateOrderNumber();
+
+            // Create the order
+            $order = Order::create([
                 'number' => $orderNumber,
-                'address_id' => $request->input('address_id'),
-                'payment_type' => $request->input('payment_type'),
-                'note' => $request->input('note'),
-                'total_discounts' => $total_discounts,
-                'coupon_discount' => $total_discounts, // Store the coupon discount
-                'delivery_fee' => $delivery_fee,
-                'total_taxes' => $total_taxes,
-                'total_prices' => $total_prices + $delivery_fee,
+                'order_status' => 1, // Pending
+                'total_taxes' => $orderCalculation['total_taxes'],
+                'delivery_fee' => $orderCalculation['delivery_fee'],
+                'total_prices' => $orderCalculation['total_prices'],
+                'total_discounts' => $orderCalculation['total_discounts'],
+                'coupon_discount' => $orderCalculation['coupon_discount'],
+                'payment_type' => $request->payment_type,
+                'payment_status' => 2, // Unpaid
                 'date' => now(),
-                'user_id' => $user_id,
-                'shop_id' => $request->input('shop_id'),
+                'note' => $request->note,
+                'photo_note' => $request->photo_note,
+                'user_id' => $user->id,
+                'address_id' => $request->address_id,
+                'shop_id' => $shopId,
             ]);
-    
-            // Handle photo note upload
-            if ($request->hasFile('photo_note')) {
-                $the_file_path = uploadImage('assets/admin/uploads', $request->file('photo_note'));
-                $order->photo_note = $the_file_path;
-            }
-            $order->save();
-    
-            // Calculate totals for cart items
+
+            // Create order products
             foreach ($cartItems as $cartItem) {
-                $total_price_after_tax_for_result = $cartItem->price * $cartItem->quantity;
-                $total_price_before_tax_for_result = $total_price_after_tax_for_result / (1 + ($cartItem->product->tax / 100));
-                $totalPriceBeforeTaxSum += $total_price_before_tax_for_result;
+                $product = $cartItem->product;
+                
+                // Calculate tax (assuming 16% tax rate - adjust as needed)
+                $taxPercentage = 16.0;
+                $totalPriceBeforeTax = $cartItem->total_price_product;
+                $taxValue = ($totalPriceBeforeTax * $taxPercentage) / 100;
+                $totalPriceAfterTax = $totalPriceBeforeTax + $taxValue;
+
+                // Calculate discount values
+                $originalPrice = $product->selling_price;
+                $currentPrice = $cartItem->price;
+                $discountPercentage = 0;
+                $discountValue = 0;
+
+                if ($cartItem->offer_id) {
+                    $discountValue = ($originalPrice - $currentPrice) * $cartItem->quantity;
+                    $discountPercentage = $originalPrice > 0 ? (($originalPrice - $currentPrice) / $originalPrice) * 100 : 0;
+                }
+
+                // Handle variations - create separate order product for each variation
+                if ($cartItem->variations->isNotEmpty()) {
+                    foreach ($cartItem->variations as $variation) {
+                        OrderProduct::create([
+                            'order_id' => $order->id,
+                            'product_id' => $cartItem->product_id,
+                            'variation_id' => $variation->id,
+                            'quantity' => $cartItem->quantity,
+                            'unit_price' => $cartItem->price / $cartItem->quantity,
+                            'total_price_after_tax' => $totalPriceAfterTax,
+                            'tax_percentage' => $taxPercentage,
+                            'tax_value' => $taxValue,
+                            'total_price_before_tax' => $totalPriceBeforeTax,
+                            'discount_percentage' => $discountPercentage,
+                            'discount_value' => $discountValue,
+                            'line_discount_percentage' => null,
+                            'line_discount_value' => null,
+                        ]);
+                    }
+                } else {
+                    // Create order product without variations
+                    OrderProduct::create([
+                        'order_id' => $order->id,
+                        'product_id' => $cartItem->product_id,
+                        'variation_id' => null,
+                        'quantity' => $cartItem->quantity,
+                        'unit_price' => $cartItem->price / $cartItem->quantity,
+                        'total_price_after_tax' => $totalPriceAfterTax,
+                        'tax_percentage' => $taxPercentage,
+                        'tax_value' => $taxValue,
+                        'total_price_before_tax' => $totalPriceBeforeTax,
+                        'discount_percentage' => $discountPercentage,
+                        'discount_value' => $discountValue,
+                        'line_discount_percentage' => null,
+                        'line_discount_value' => null,
+                    ]);
+                }
             }
-    
-            $final_result_total_price_before_tax = $totalPriceBeforeTaxSum;
-            $discount_percentage = $total_discounts / $final_result_total_price_before_tax;
-    
-            // Attach cart items to the order
-            foreach ($cartItems as $cartItem) {
-                $unit_id = ($user_type == 1) ? $cartItem->product->unit->id : $cartItem->product->units()->first()->id;
-    
-                $total_price_after_tax = $cartItem->price * $cartItem->quantity;
-                $total_price_before_tax = $total_price_after_tax / (1 + ($cartItem->product->tax / 100));
-    
-                $order->products()->attach($cartItem->product_id, [
-                    'quantity' => $cartItem->quantity,
-                    'unit_price' => $cartItem->price,
-                    'variation_id' => $cartItem->variation_id,
-                    'unit_id' => $unit_id,
-                    'total_price_after_tax' => $total_price_after_tax,
-                    'total_price_before_tax' => $total_price_before_tax,
-                    'tax_percentage' => $cartItem->product->tax,
-                    'discount_percentage' => $discount_percentage,
-                    'discount_value' => $discount_percentage * $total_price_before_tax,
-                    'line_discount_percentage' => null,
-                    'line_discount_value' => null,
-                    'tax_value' => ($total_price_before_tax - ($discount_percentage * $total_price_before_tax)) * ($cartItem->product->tax / 100),
-                ]);
-            }
-    
-            // Update cart status to processed (status 2)
-            Cart::where('user_id', $user_id)->where('status', 1)->update([
-                'status' => 2,
+
+            // Clear the cart
+            $this->clearUserCart($user->id);
+
+            // Load order with relationships for response
+            $order->load([
+                'shop',
+                'address',
+                'orderProducts' => function($query) {
+                    $query->with(['product.photos', 'variation']);
+                }
             ]);
-    
-            // Delete user coupon after the order is completed
-            $userCoupon = UserCoupon::where('user_id', $user_id)->first();
-            if ($userCoupon) {
-                $userCoupon->delete();
-            }
-    
-            // Commit the transaction
+
             DB::commit();
-    
-            // Log the response and return success
-            $response = response()->json($order, 200);
-            Log::info('Order Response', ['response' => $response->getContent()]);
-            return $response;
-    
+
+            return response()->json([
+                'success' => true,
+                'data' => $order,
+                'message' => 'Order created successfully.'
+            ], 201);
+
         } catch (\Exception $e) {
-            // Rollback the transaction in case of an error
-            DB::rollBack();
-            Log::error('Order Creation Error', ['error' => $e->getMessage()]);
-            return response()->json(['message' => 'Order creation failed', 'error' => $e->getMessage()], 500);
+            DB::rollback();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create order: ' . $e->getMessage()
+            ], 500);
         }
     }
-    
 
+    /**
+     * Display the specified order
+     */
+    public function show($id)
+    {
+        $user = auth()->user();
+        
+        $order = Order::with([
+            'shop',
+            'address',
+            'orderProducts' => function($query) {
+                $query->with(['product.photos', 'variation']);
+            }
+        ])
+        ->where('user_id', $user->id)
+        ->findOrFail($id);
 
-      public function cancel_order($id)
-      {
-          // Find the order by ID
-          $order = Order::find($id);
+        return response()->json([
+            'success' => true,
+            'data' => $order
+        ], 200);
+    }
 
-          // Check if the order exists
-          if (!$order) {
-              return response()->json(['message' => 'Order not found'], 404);
-          }
+    /**
+     * Update order status (for admin/shop owner)
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|integer|in:1,2,3,4,5,6', // 1-6 as defined in schema
+        ]);
 
-          // Check if the order is cancellable (you may need to add additional logic here)
-          if ($order->order_status == 1 ) {
-              // Update the order status to cancelled
-              $order->update(['order_status' => 5]);
+        $order = Order::findOrFail($id);
+        $order->order_status = $request->status;
+        $order->save();
 
+        return response()->json([
+            'success' => true,
+            'data' => $order,
+            'message' => 'Order status updated successfully.'
+        ], 200);
+    }
 
-              return response()->json(['message' => 'Order cancelled successfully'], 200);
-          } else {
-              return response()->json(['message' => 'Order is already cancelled'], 422);
-          }
-      }
+    /**
+     * Cancel an order (only if pending or accepted)
+     */
+    public function cancel($id)
+    {
+        $user = auth()->user();
+        
+        $order = Order::where('user_id', $user->id)->findOrFail($id);
 
+        // Only allow cancellation if order is pending or accepted
+        if (!in_array($order->order_status, [1, 2])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This order cannot be cancelled.'
+            ], 400);
+        }
 
+        $order->order_status = 5; // Canceled
+        $order->save();
 
+        return response()->json([
+            'success' => true,
+            'message' => 'Order cancelled successfully.'
+        ], 200);
+    }
 
+    /**
+     * Get order tracking information
+     */
+    public function tracking($id)
+    {
+        $user = auth()->user();
+        
+        $order = Order::where('user_id', $user->id)->findOrFail($id);
+
+        $statusText = $this->getOrderStatusText($order->order_status);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'order_number' => $order->number,
+                'status' => $order->order_status,
+                'status_text' => $statusText,
+                'date' => $order->date,
+                'estimated_delivery' => $this->getEstimatedDelivery($order),
+            ]
+        ], 200);
+    }
+
+    /**
+     * Calculate order totals from cart items
+     */
+    private function calculateOrderTotals($cartItems, $userId)
+    {
+        $subtotal = 0;
+        $totalDiscounts = 0;
+        $deliveryFee = 30.0; // Set your delivery fee
+        $taxRate = 16.0; // 16% tax
+
+        // Calculate subtotal and discounts
+        foreach ($cartItems as $item) {
+            $subtotal += $item->total_price_product;
+            
+            if ($item->offer_id) {
+                $originalPrice = $item->product->selling_price * $item->quantity;
+                $discount = $originalPrice - $item->total_price_product;
+                $totalDiscounts += $discount;
+            }
+        }
+
+        // Get coupon discount
+        $couponDiscount = 0;
+        $userCoupons = UserCoupon::where('user_id', $userId)->with('coupon')->get();
+        foreach ($userCoupons as $userCoupon) {
+            if ($userCoupon->coupon && $userCoupon->coupon->expired_at > now()) {
+                $couponDiscount += $userCoupon->coupon->amount;
+            }
+        }
+
+        // Calculate taxes
+        $totalTaxes = ($subtotal * $taxRate) / 100;
+        
+        // Final total
+        $totalPrices = $subtotal + $totalTaxes + $deliveryFee - $couponDiscount;
+
+        return [
+            'total_taxes' => $totalTaxes,
+            'delivery_fee' => $deliveryFee,
+            'total_prices' => $totalPrices,
+            'total_discounts' => $totalDiscounts,
+            'coupon_discount' => $couponDiscount,
+        ];
+    }
+
+    /**
+     * Generate unique order number
+     */
+    private function generateOrderNumber()
+    {
+        $lastOrder = Order::orderBy('id', 'desc')->first();
+        return $lastOrder ? $lastOrder->number + 1 : 1000;
+    }
+
+    /**
+     * Clear user's cart after order creation
+     */
+    private function clearUserCart($userId)
+    {
+        // Get cart items
+        $cartItems = Cart::where('user_id', $userId)->where('status', 1)->get();
+        
+        // Delete cart variations
+        foreach ($cartItems as $cart) {
+            \App\Models\CartVariation::where('cart_id', $cart->id)->delete();
+        }
+        
+        // Delete cart items
+        Cart::where('user_id', $userId)->where('status', 1)->delete();
+        
+        // Remove user coupons
+        UserCoupon::where('user_id', $userId)->delete();
+    }
+
+    /**
+     * Get order status text
+     */
+    private function getOrderStatusText($status)
+    {
+        $statuses = [
+            1 => 'Pending',
+            2 => 'Accepted',
+            3 => 'On The Way',
+            4 => 'Delivered',
+            5 => 'Canceled',
+            6 => 'Refund'
+        ];
+
+        return $statuses[$status] ?? 'Unknown';
+    }
+
+    /**
+     * Get estimated delivery time
+     */
+    private function getEstimatedDelivery($order)
+    {
+        switch ($order->order_status) {
+            case 1: // Pending
+                return now()->addHours(2)->format('Y-m-d H:i:s');
+            case 2: // Accepted
+                return now()->addMinutes(45)->format('Y-m-d H:i:s');
+            case 3: // On The Way
+                return now()->addMinutes(20)->format('Y-m-d H:i:s');
+            case 4: // Delivered
+                return $order->updated_at->format('Y-m-d H:i:s');
+            default:
+                return null;
+        }
+    }
 }
