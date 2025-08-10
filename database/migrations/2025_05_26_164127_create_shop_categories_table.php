@@ -1,0 +1,39 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        Schema::create('shop_categories', function (Blueprint $table) {
+            $table->id();
+            $table->string('name_en');
+            $table->string('name_ar');
+            $table->string('photo')->nullable();
+            $table->timestamps();
+        });
+
+          DB::table('shop_categories')->insert([
+            ['name_en'=>'Food & Restaurants','name_ar'=>'المطاعم'],
+            ['name_en'=>'Fashion & Clothing','name_ar'=>'الملابس']
+          ]);
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::dropIfExists('shop_categories');
+    }
+};
