@@ -193,4 +193,46 @@ class ProductController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()]);
         }
     }
+
+        public function search(Request $request)
+    {
+        $term = $request->get('term');
+        
+        $products = Product::where('name_en', 'LIKE', '%' . $term . '%')
+                        ->orWhere('name_ar', 'LIKE', '%' . $term . '%')
+                        ->where('status', 1) // Only active products
+                        ->select('id', 'name_en', 'name_ar', 'selling_price')
+                        ->limit(20)
+                        ->get();
+        
+        // Format the response with localized names
+        $formattedProducts = $products->map(function($product) {
+            return [
+                'id' => $product->id,
+                'name' => app()->getLocale() == 'ar' ? $product->name_ar : $product->name_en,
+            ];
+        });
+        
+        return response()->json($formattedProducts);
+    }
+
+    /**
+     * Get product prices - fix the method name to match your route
+     */
+    public function getPrices($id)
+    {
+        $product = Product::find($id);
+        
+        if (!$product) {
+            return response()->json([
+                'selling_price' => null,
+                'selling_price_for_user' => null,
+            ], 404);
+        }
+        
+        return response()->json([
+            'selling_price' => $product->selling_price,
+            'selling_price_for_user' => $product->selling_price_for_user ?? $product->selling_price, // fallback if no user price
+        ]);
+    }
 }

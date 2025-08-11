@@ -121,7 +121,7 @@
     </div>
 </div>
 
-
+@endsection
 
 @push('scripts')
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -165,13 +165,13 @@
                 method: 'GET',
                 success: function(response) {
                     if (response.selling_price) {
-                        $('#selling_price_display').text(' + parseFloat(response.selling_price).toFixed(2)); // Display the selling price
+                        $('#selling_price_display').text('$' + parseFloat(response.selling_price).toFixed(2)); // Display the selling price
                     } else {
                         $('#selling_price_display').text('N/A'); // Default if no selling price is found
                     }
 
                     if (response.selling_price_for_user) {
-                        $('#selling_price_for_user_display').text(' + parseFloat(response.selling_price_for_user).toFixed(2)); // Display selling_price_for_user
+                        $('#selling_price_for_user_display').text('$' + parseFloat(response.selling_price_for_user).toFixed(2)); // Display selling_price_for_user
                     } else {
                         $('#selling_price_for_user_display').text('N/A'); // Default if no selling_price_for_user is found
                     }
@@ -195,4 +195,3 @@
     });
 </script>
 @endpush
-@endsection
