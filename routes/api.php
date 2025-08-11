@@ -49,6 +49,7 @@ Route::group(['prefix' => 'v1/user'], function () {
 
     Route::get('/products/{id}', [ProductController::class, 'productDetails']); // Done
     Route::get('products/search', [ProductController::class, 'searchProducts']);
+    Route::get('products/offers', [ProductController::class, 'offerProducts']);
     //Category product
     Route::get('/categories/{id}/products',  [CategoryController::class, 'getProducts']); // Done
     Route::get('/categories', [CategoryController::class, 'index']); // Done

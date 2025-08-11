@@ -173,6 +173,105 @@ class ProductController extends Controller
         ]);
     }
 
+    public function offerProducts(Request $request)
+    {
+        // Try to get the authenticated user
+        $token = $request->bearerToken();
+        $authenticatedUser = null;
+
+        if ($token) {
+            $authenticatedUser = Auth::guard('user-api')->user();
+        }
+
+        // Build query for products with active offers
+        $query = Product::with([
+            'photos',
+            'variations',
+            'offers' => function ($query) {
+                $query->whereDate('expired_at', '>', now())
+                    ->orderBy('discount_percentage', 'desc'); // Order offers by discount percentage
+            },
+            'category'
+        ])
+        ->whereHas('offers', function ($q) {
+            $q->whereDate('expired_at', '>', now());
+        })
+        ->where('status', 1); // Only active products
+
+        // Optional: Filter by category
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        // Optional: Filter by minimum discount percentage
+        if ($request->filled('min_discount')) {
+            $query->whereHas('offers', function ($q) use ($request) {
+                $q->whereDate('expired_at', '>', now())
+                ->where('discount_percentage', '>=', $request->min_discount);
+            });
+        }
+
+        // Optional: Search by product name
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $locale = app()->getLocale();
+            
+            $query->where(function ($q) use ($searchTerm, $locale) {
+                $q->where("name_{$locale}", 'LIKE', "%{$searchTerm}%")
+                ->orWhere("description_{$locale}", 'LIKE', "%{$searchTerm}%");
+            });
+        }
+
+        
+
+        // Pagination
+        $perPage = $request->get('per_page', 15);
+        $products = $query->paginate($perPage);
+
+        // Add is_favourite flag and calculate offer details for each product
+        $products->getCollection()->transform(function ($product) use ($authenticatedUser) {
+            // Add is_favourite flag
+            $product->is_favourite = false;
+            if ($authenticatedUser) {
+                $product->is_favourite = $authenticatedUser
+                    ->favourites()
+                    ->where('product_id', $product->id)
+                    ->exists();
+            }
+
+            // Add offer summary (best offer details)
+            if ($product->offers->isNotEmpty()) {
+                $bestOffer = $product->offers->sortByDesc('discount_percentage')->first();
+                $product->best_offer = [
+                    'id' => $bestOffer->id,
+                    'discount_percentage' => $bestOffer->discount_percentage,
+                    'discount_amount' => $bestOffer->discount_amount ?? null,
+                    'final_price' => $product->selling_price - ($product->selling_price * $bestOffer->discount_percentage / 100),
+                    'expires_at' => $bestOffer->expired_at,
+                    'expires_in_days' => now()->diffInDays($bestOffer->expired_at),
+                ];
+            }
+
+            return $product;
+        });
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Products with active offers retrieved successfully',
+            'data' => $products->items(),
+            'pagination' => [
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+                'from' => $products->firstItem(),
+                'to' => $products->lastItem(),
+            ]
+        ]);
+    }
+
+
+
 
 
 }
