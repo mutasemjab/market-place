@@ -63,6 +63,9 @@ Route::group(['prefix' => LaravelLocalization::setLocale(), 'middleware' => ['lo
 
 
 
+        Route::get('/products/search', [ProductController::class, 'search'])->name('admin.products.search');
+        Route::get('/products/get-prices/{id}', [ProductController::class, 'getPrices'])->name('admin.products.get-prices');
+
 
 
         // Resource Route
@@ -85,8 +88,7 @@ Route::group(['prefix' => LaravelLocalization::setLocale(), 'middleware' => ['lo
         Route::get('/users/toggle-status/{id}', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
         Route::get('/users/adjust-balance/{id}', [UserController::class, 'adjustBalance'])->name('users.adjust-balance');
         Route::get('/users/generate-referal-code', [UserController::class, 'generateReferalCode'])->name('users.generate-referal-code');
-        Route::get('/products/search', [ProductController::class, 'search'])->name('admin.products.search');
-        Route::get('/products/get-prices/{id}', [ProductController::class, 'getPrices'])->name('admin.products.get-prices');
+       
 
         Route::get('/search-users', [UserController::class, 'search'])->name('search.users');
         Route::get('/user/{id}/addresses', [UserController::class, 'addresses'])->name('user.addresses');
