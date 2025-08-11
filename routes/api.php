@@ -47,9 +47,9 @@ Route::group(['prefix' => 'v1/user'], function () {
     Route::get('/pages/{type}', [PageController::class, 'index']);
 
 
-    Route::get('/products/{id}', [ProductController::class, 'productDetails']); // Done
-    Route::get('/products/search', [ProductController::class, 'searchProducts']);
-    Route::get('/products/offers', [ProductController::class, 'offerProducts']);
+    Route::get('/products/search', [ProductController::class, 'searchProducts']); // This should come FIRST
+    Route::get('/products/offers', [ProductController::class, 'offerProducts']); // This should come SECOND
+    Route::get('/products/{id}', [ProductController::class, 'productDetails']); // This should come LAST
     //Category product
     Route::get('/categories/{id}/products',  [CategoryController::class, 'getProducts']); // Done
     Route::get('/categories', [CategoryController::class, 'index']); // Done
