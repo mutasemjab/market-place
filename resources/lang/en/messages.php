@@ -518,6 +518,49 @@ return [
 
     // No Data Messages
     'No_users_found' => 'No users found.',
+    'Add_New' => 'Add New',
+    'create' => 'Create',
+    'update' => 'Update',
+    'edit' => 'Edit',
+    'delete' => 'Delete',
+    'view' => 'View',
+    'cancel' => 'Cancel',
+    'back' => 'Back',
+    'actions' => 'Actions',
+    'id' => 'ID',
+    'created_at' => 'Created At',
+    'updated_at' => 'Updated At',
+    'confirm_delete' => 'Are you sure you want to delete this item?',
+
+    // Offers
+    'offers' => 'Offers',
+    'offer' => 'Offer',
+    'offer_details' => 'Offer Details',
+    'price' => 'Price',
+    'start_date' => 'Start Date',
+    'expiry_date' => 'Expiry Date',
+    'product' => 'Product',
+    'shop' => 'Shop',
+    'status' => 'Status',
+    
+    // Status
+    'active' => 'Active',
+    'expired' => 'Expired',
+    'upcoming' => 'Upcoming',
+    
+    // Messages
+    'offer_created_successfully' => 'Offer created successfully!',
+    'offer_updated_successfully' => 'Offer updated successfully!',
+    'offer_deleted_successfully' => 'Offer deleted successfully!',
+    'no_offers_found' => 'No offers found.',
+    'offer_is_currently_active' => 'This offer is currently active.',
+    'offer_has_expired' => 'This offer has expired.',
+    'offer_will_start_soon' => 'This offer will start soon.',
+    
+    // Form
+    'select_product' => 'Select a product',
+    'select_shop' => 'Select a shop',
+    'not_specified' => 'Not specified',
     '' => '',
     '' => '',
     '' => '',

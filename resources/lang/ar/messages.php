@@ -608,6 +608,47 @@ return [
 
     // No Data Messages
     'No_users_found' => 'لم يتم العثور على مستخدمين.',
+     'Add_New' => 'إضافة جديد',
+    'create' => 'إنشاء',
+    'update' => 'تحديث',
+    'edit' => 'تعديل',
+    'delete' => 'حذف',
+    'view' => 'عرض',
+    'cancel' => 'إلغاء',
+    'back' => 'رجوع',
+    'actions' => 'العمليات',
+    'id' => 'المعرف',
+    'created_at' => 'تاريخ الإنشاء',
+    'updated_at' => 'تاريخ التحديث',
+    'confirm_delete' => 'هل أنت متأكد من حذف هذا العنصر؟',
+
+    // Offers
+    'offers' => 'العروض',
+    'offer' => 'العرض',
+    'offer_details' => 'تفاصيل العرض',
+    'price' => 'السعر',
+    'start_date' => 'تاريخ البداية',
+    'expiry_date' => 'تاريخ الانتهاء',
+    'product' => 'المنتج',
+    'shop' => 'المتجر',
+    'status' => 'الحالة',
+    
+    // Status
+    'active' => 'نشط',
+    'expired' => 'منتهي',
+    'upcoming' => 'قادم',
+    
+    // Messages
+    'offer_created_successfully' => 'تم إنشاء العرض بنجاح!',
+    'offer_updated_successfully' => 'تم تحديث العرض بنجاح!',
+    'offer_deleted_successfully' => 'تم حذف العرض بنجاح!',
+    'no_offers_found' => 'لا توجد عروض.',
+    'offer_is_currently_active' => 'هذا العرض نشط حالياً.',
+    'offer_has_expired' => 'هذا العرض منتهي الصلاحية.',
+    'offer_will_start_soon' => 'هذا العرض سيبدأ قريباً.',
+    
+    // Form
+    'select_product' => 'اختر منتج',
     ""=>"",
     ""=>"",
     ""=>"",

@@ -1,123 +1,135 @@
 @extends('layouts.admin')
-@section('title')
-    {{ __('messages.offers') }}
+@section('css')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 @endsection
-
 
 @section('content')
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title card_title_center"> {{ __('messages.New') }}{{ __('messages.offers') }} </h3>
-        </div>
-        <!-- /.card-header -->
-        <div class="card-body">
-
-
-            <form action="{{ route('offers.store') }}" method="post" enctype='multipart/form-data'>
-                <div class="row">
-                    @csrf
-
-
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label for="user_type">{{ __('messages.user_type') }}</label>
-                            <select name="user_type" class="form-control" required>
-                                <option value="1">{{ __('messages.User') }}</option>
-                                <option value="2">{{ __('messages.wholeSales') }}</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label> {{ __('messages.Price') }}</label>
-                            <input name="price" id="price" class="form-control" value="{{ old('price') }}">
-                            @error('price')
-                                <span class="text-danger">{{ $message }}</span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label> {{ __('messages.start_at') }}</label>
-                            <input type="date" name="start_at" id="price" class="form-control"
-                                value="{{ old('start_at') }}">
-                            @error('start_at')
-                                <span class="text-danger">{{ $message }}</span>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label> {{ __('messages.end_at') }}</label>
-                            <input type="date" name="expired_at" id="price" class="form-control"
-                                value="{{ old('expired_at') }}">
-                            @error('expired_at')
-                                <span class="text-danger">{{ $message }}</span>
-                            @enderror
-                        </div>
-                    </div>
-
-
-
-                    <div class="form-group col-md-6">
-                        <label for="product_id">{{ __('messages.products') }}</label>
-                        <select class="form-control" name="product" id="product_id">
-                            <option value="">Select Product</option>
-                            @foreach ($products as $product)
-                                <option value="{{ $product->id }}">{{ $product->name_ar }}</option>
-                            @endforeach
-                        </select>
-                        @error('product')
-                            <span class="text-danger">{{ $message }}</span>
-                        @enderror
-                    </div>
-                    
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{ __('messages.selling_price') }}</label>
-                            <div id="selling_price_display">N/A</div> <!-- Display area for the selling price -->
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>{{ __('messages.selling_price_for_user') }}</label>
-                            <div id="selling_price_for_user_display">N/A</div> <!-- Display area for selling_price_for_user -->
-                        </div>
-                    </div>
-
-                    <div class="col-md-12">
-                        <div class="form-group text-center">
-                            <button id="do_add_item_cardd" type="submit" class="btn btn-primary btn-sm">
-                                {{ __('messages.Submit') }}</button>
-                            <a href="{{ route('offers.index') }}"
-                                class="btn btn-sm btn-danger">{{ __('messages.Cancel') }}</a>
-
-                        </div>
-                    </div>
-
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header">
+                    <h4>{{ __('messages.Add_New') }} {{ __('messages.offer') }}</h4>
                 </div>
-            </form>
 
+                <div class="card-body">
+                    <form action="{{ route('offers.store') }}" method="POST">
+                        @csrf
+                        
+                        <div class="mb-3">
+                            <label for="price" class="form-label">{{ __('messages.price') }} <span class="text-danger">*</span></label>
+                            <input type="number" 
+                                   class="form-control @error('price') is-invalid @enderror" 
+                                   id="price" 
+                                   name="price" 
+                                   value="{{ old('price') }}"
+                                   step="0.01" 
+                                   min="0"
+                                   required>
+                            @error('price')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
 
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="start_at" class="form-label">{{ __('messages.start_date') }} <span class="text-danger">*</span></label>
+                                    <input type="date" 
+                                           class="form-control @error('start_at') is-invalid @enderror" 
+                                           id="start_at" 
+                                           name="start_at" 
+                                           value="{{ old('start_at') }}"
+                                           required>
+                                    @error('start_at')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="expired_at" class="form-label">{{ __('messages.expiry_date') }} <span class="text-danger">*</span></label>
+                                    <input type="date" 
+                                           class="form-control @error('expired_at') is-invalid @enderror" 
+                                           id="expired_at" 
+                                           name="expired_at" 
+                                           value="{{ old('expired_at') }}"
+                                           required>
+                                    @error('expired_at')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                        </div>
 
+                        <div class="mb-3">
+                            <label for="product_id" class="form-label">{{ __('messages.product') }}</label>
+                            <select class="form-select @error('product_id') is-invalid @enderror" 
+                                    id="product_id" 
+                                    name="product_id">
+                                <option value="">{{ __('messages.select_product') }}</option>
+                            </select>
+                            @error('product_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            
+                            <!-- Product Price Display -->
+                            <div class="mt-2">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <small class="text-muted">{{ __('messages.selling_price') }}:</small>
+                                        <span id="selling_price_display" class="fw-bold text-success ms-1">N/A</span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted">{{ __('messages.selling_price_for_user') }}:</small>
+                                        <span id="selling_price_for_user_display" class="fw-bold text-info ms-1">N/A</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="shop_id" class="form-label">{{ __('messages.shop') }}</label>
+                            <select class="form-select @error('shop_id') is-invalid @enderror" 
+                                    id="shop_id" 
+                                    name="shop_id">
+                                <option value="">{{ __('messages.select_shop') }}</option>
+                                @foreach($shops as $shop)
+                                    <option value="{{ $shop->id }}" 
+                                            {{ old('shop_id') == $shop->id ? 'selected' : '' }}>
+                                        {{ $shop->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('shop_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ route('offers.index') }}" class="btn btn-secondary">
+                                {{ __('messages.cancel') }}
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                {{ __('messages.create') }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-
-
-
-
     </div>
-    </div>
-@endsection
+</div>
 
-@section('script')
+
+
+@push('scripts')
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     $(document).ready(function() {
         $('#product_id').select2({
-            placeholder: 'Select Product',
+            placeholder: '{{ __("messages.select_product") }}',
             allowClear: true,
             minimumInputLength: 0,
             ajax: {
@@ -153,13 +165,13 @@
                 method: 'GET',
                 success: function(response) {
                     if (response.selling_price) {
-                        $('#selling_price_display').text(response.selling_price); // Display the selling price
+                        $('#selling_price_display').text(' + parseFloat(response.selling_price).toFixed(2)); // Display the selling price
                     } else {
                         $('#selling_price_display').text('N/A'); // Default if no selling price is found
                     }
 
                     if (response.selling_price_for_user) {
-                        $('#selling_price_for_user_display').text(response.selling_price_for_user); // Display selling_price_for_user
+                        $('#selling_price_for_user_display').text(' + parseFloat(response.selling_price_for_user).toFixed(2)); // Display selling_price_for_user
                     } else {
                         $('#selling_price_for_user_display').text('N/A'); // Default if no selling_price_for_user is found
                     }
@@ -171,11 +183,16 @@
             });
         });
 
+        // Clear prices when product is cleared
+        $('#product_id').on('select2:clear', function (e) {
+            $('#selling_price_display').text('N/A');
+            $('#selling_price_for_user_display').text('N/A');
+        });
+
         // Initialize the display with N/A
         $('#selling_price_display').text('N/A');
         $('#selling_price_for_user_display').text('N/A');
     });
 </script>
+@endpush
 @endsection
-
-

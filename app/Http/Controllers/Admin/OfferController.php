@@ -3,162 +3,77 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+
 use App\Models\Offer;
 use App\Models\Product;
+use App\Models\Shop;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class OfferController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
     public function index()
     {
-        $data= Offer::where('shop_id',auth()->user()->shop_id)->paginate(PAGINATION_COUNT);
-
-        return view('admin.offers.index',compact('data'));
+        $offers = Offer::with(['product', 'shop'])->paginate(10);
+        return view('admin.offers.index', compact('offers'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
     public function create()
     {
-        $products = Product::get();
-        return view('admin.offers.create',compact('products'));
+        $products = Product::all();
+        $shops = Shop::all();
+        return view('admin.offers.create', compact('products', 'shops'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
     public function store(Request $request)
     {
-        try{
-            $offer = new Offer();
+        $request->validate([
+            'price' => 'required|numeric|min:0',
+            'start_at' => 'required|date|after_or_equal:today',
+            'expired_at' => 'required|date|after:start_at',
+            'product_id' => 'nullable|exists:products,id',
+            'shop_id' => 'nullable|exists:shops,id',
+        ]);
 
-            $offer->price = $request->get('price');
-            $offer->start_at = $request->get('start_at');
-            $offer->expired_at = $request->get('expired_at');
-            $offer->user_type = $request->get('user_type');
-            $offer->product_id = $request->input('product');
-            $offer->shop_id = auth()->user()->shop_id;
+        Offer::create($request->all());
 
-            if($offer->save())
-            {
-                return redirect()->route('offers.index')->with(['success' => 'Offer created']);
-            }else{
-                return redirect()->back()->with(['error' => 'Something wrong']);
-            }
-
-        }catch(\Exception $ex){
-           Log::error($ex);
-           return redirect()->back()
-            ->with(['error' => 'An error occurred: ' . $ex->getMessage()])
-            ->withInput();
-        }
-
+        return redirect()->route('offers.index')
+            ->with('success', __('messages.offer_created_successfully'));
     }
 
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
+    public function show(Offer $offer)
     {
-        //
+        $offer->load(['product', 'shop']);
+        return view('admin.offers.show', compact('offer'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id)
+    public function edit(Offer $offer)
     {
-        $data = Offer::findOrFail($id); // Retrieve the category by ID
         $products = Product::all();
-        return view('admin.offers.edit', ['products' => $products,'data' => $data]);
+        $shops = Shop::all();
+        return view('admin.offers.edit', compact('offer', 'products', 'shops'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $id)
-        {
-            try {
-                // Find the offer by ID
-                $offer = Offer::findOrFail($id);
-
-                // Update offer fields
-                $offer->price = $request->get('price');
-                $offer->start_at = $request->get('start_at');
-                $offer->expired_at = $request->get('expired_at');
-                $offer->user_type = $request->get('user_type');
-                $offer->product_id = $request->input('product');
-
-                // Save the updated offer
-                if ($offer->save()) {
-                    return redirect()->route('offers.index')->with(['success' => 'Offer updated']);
-                } else {
-                    return redirect()->back()->with(['error' => 'Something went wrong while updating the offer']);
-                }
-            } catch (\Exception $ex) {
-                Log::error($ex);
-                return redirect()->back()
-                    ->with(['error' => 'An error occurred: ' . $ex->getMessage()])
-                    ->withInput();
-            }
-        }
-
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy($id)
+    public function update(Request $request, Offer $offer)
     {
-       try {
+        $request->validate([
+            'price' => 'required|numeric|min:0',
+            'start_at' => 'required|date',
+            'expired_at' => 'required|date|after:start_at',
+            'product_id' => 'nullable|exists:products,id',
+            'shop_id' => 'nullable|exists:shops,id',
+        ]);
 
-            $item_row = Offer::select("id")->where('id','=',$id)->first();
+        $offer->update($request->all());
 
-            if (!empty($item_row)) {
+        return redirect()->route('offers.index')
+            ->with('success', __('messages.offer_updated_successfully'));
+    }
 
-        $flag = Offer::where('id','=',$id)->delete();
+    public function destroy(Offer $offer)
+    {
+        $offer->delete();
 
-        if ($flag) {
-            return redirect()->back()
-            ->with(['success' => '   Delete Succefully   ']);
-            } else {
-            return redirect()->back()
-            ->with(['error' => '   Something Wrong']);
-            }
-
-            } else {
-            return redirect()->back()
-            ->with(['error' => '   cant reach fo this data   ']);
-            }
-
-       } catch (\Exception $ex) {
-
-            return redirect()->back()
-            ->with(['error' => ' Something Wrong   ' . $ex->getMessage()]);
-            }
+        return redirect()->route('offers.index')
+            ->with('success', __('messages.offer_deleted_successfully'));
     }
 }
