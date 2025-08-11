@@ -80,10 +80,7 @@
                                         <small class="text-muted">{{ __('messages.selling_price') }}:</small>
                                         <span id="selling_price_display" class="fw-bold text-success ms-1">N/A</span>
                                     </div>
-                                    <div class="col-md-6">
-                                        <small class="text-muted">{{ __('messages.selling_price_for_user') }}:</small>
-                                        <span id="selling_price_for_user_display" class="fw-bold text-info ms-1">N/A</span>
-                                    </div>
+                                 
                                 </div>
                             </div>
                         </div>
@@ -97,7 +94,7 @@
                                 @foreach($shops as $shop)
                                     <option value="{{ $shop->id }}" 
                                             {{ old('shop_id') == $shop->id ? 'selected' : '' }}>
-                                        {{ $shop->name }}
+                                        {{ $shop->name_ar }}
                                     </option>
                                 @endforeach
                             </select>
@@ -165,16 +162,12 @@
                 method: 'GET',
                 success: function(response) {
                     if (response.selling_price) {
-                        $('#selling_price_display').text('$' + parseFloat(response.selling_price).toFixed(2));
+                        $('#selling_price_display').text('JD' + parseFloat(response.selling_price).toFixed(2));
                     } else {
                         $('#selling_price_display').text('N/A');
                     }
 
-                    if (response.selling_price_for_user) {
-                        $('#selling_price_for_user_display').text('$' + parseFloat(response.selling_price_for_user).toFixed(2));
-                    } else {
-                        $('#selling_price_for_user_display').text('N/A');
-                    }
+                 
                 },
                 error: function() {
                     $('#selling_price_display').text('N/A');
