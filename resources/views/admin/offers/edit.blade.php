@@ -65,11 +65,13 @@
 
                         <div class="mb-3">
                             <label for="product_id" class="form-label">{{ __('messages.product') }}</label>
-                            <select class="form-select @error('product_id') is-invalid @enderror" 
+                            <select class="form-control @error('product_id') is-invalid @enderror" 
                                     id="product_id" 
                                     name="product_id">
                                 @if($offer->product)
-                                    <option value="{{ $offer->product->id }}" selected>{{ $offer->product->name }}</option>
+                                    <option value="{{ $offer->product->id }}" selected>
+                                        {{ app()->getLocale() == 'ar' ? $offer->product->name_ar : $offer->product->name_en }}
+                                    </option>
                                 @else
                                     <option value="">{{ __('messages.select_product') }}</option>
                                 @endif
@@ -85,24 +87,20 @@
                                         <small class="text-muted">{{ __('messages.selling_price') }}:</small>
                                         <span id="selling_price_display" class="fw-bold text-success ms-1">N/A</span>
                                     </div>
-                                    <div class="col-md-6">
-                                        <small class="text-muted">{{ __('messages.selling_price_for_user') }}:</small>
-                                        <span id="selling_price_for_user_display" class="fw-bold text-info ms-1">N/A</span>
-                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="mb-3">
                             <label for="shop_id" class="form-label">{{ __('messages.shop') }}</label>
-                            <select class="form-select @error('shop_id') is-invalid @enderror" 
+                            <select class="form-control @error('shop_id') is-invalid @enderror" 
                                     id="shop_id" 
                                     name="shop_id">
                                 <option value="">{{ __('messages.select_shop') }}</option>
                                 @foreach($shops as $shop)
                                     <option value="{{ $shop->id }}" 
                                             {{ (old('shop_id', $offer->shop_id) == $shop->id) ? 'selected' : '' }}>
-                                        {{ $shop->name }}
+                                        {{ $shop->name_ar }}
                                     </option>
                                 @endforeach
                             </select>
@@ -125,25 +123,25 @@
         </div>
     </div>
 </div>
-
-
+@endsection
 
 @push('scripts')
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     $(document).ready(function() {
+        // Initialize Select2
         $('#product_id').select2({
             placeholder: '{{ __("messages.select_product") }}',
             allowClear: true,
             minimumInputLength: 0,
             ajax: {
-                url: '{{ route('products.search') }}',
+                url: '{{ route('admin.products.search') }}',
                 dataType: 'json',
                 delay: 250,
                 data: function(params) {
                     return {
-                        term: params.term // search term
+                        term: params.term
                     };
                 },
                 processResults: function(data) {
@@ -151,7 +149,7 @@
                         results: $.map(data, function(item) {
                             return {
                                 id: item.id,
-                                text: item.name,
+                                text: item.name
                             };
                         })
                     };
@@ -162,28 +160,21 @@
 
         // Event listener for when a product is selected
         $('#product_id').on('select2:select', function (e) {
-            var productId = e.params.data.id; // Get selected product ID
+            var productId = e.params.data.id;
 
             // AJAX request to get selling prices for the selected product
             $.ajax({
-                url: '/products/get-prices/' + productId, // Create a new route for this purpose
+                url: '{{ route('admin.products.get-prices', ':id') }}'.replace(':id', productId),
                 method: 'GET',
                 success: function(response) {
                     if (response.selling_price) {
-                        $('#selling_price_display').text(' + parseFloat(response.selling_price).toFixed(2)); // Display the selling price
+                        $('#selling_price_display').text('JD' + parseFloat(response.selling_price).toFixed(2));
                     } else {
-                        $('#selling_price_display').text('N/A'); // Default if no selling price is found
-                    }
-
-                    if (response.selling_price_for_user) {
-                        $('#selling_price_for_user_display').text(' + parseFloat(response.selling_price_for_user).toFixed(2)); // Display selling_price_for_user
-                    } else {
-                        $('#selling_price_for_user_display').text('N/A'); // Default if no selling_price_for_user is found
+                        $('#selling_price_display').text('N/A');
                     }
                 },
                 error: function() {
-                    $('#selling_price_display').text('N/A'); // Handle error
-                    $('#selling_price_for_user_display').text('N/A'); // Handle error
+                    $('#selling_price_display').text('N/A');
                 }
             });
         });
@@ -191,39 +182,29 @@
         // Clear prices when product is cleared
         $('#product_id').on('select2:clear', function (e) {
             $('#selling_price_display').text('N/A');
-            $('#selling_price_for_user_display').text('N/A');
         });
 
         // Load prices for initially selected product (in edit mode)
         @if($offer->product_id)
             var initialProductId = {{ $offer->product_id }};
             $.ajax({
-                url: '/products/get-prices/' + initialProductId,
+                url: '{{ route('admin.products.get-prices', ':id') }}'.replace(':id', initialProductId),
                 method: 'GET',
                 success: function(response) {
                     if (response.selling_price) {
-                        $('#selling_price_display').text(' + parseFloat(response.selling_price).toFixed(2));
+                        $('#selling_price_display').text('JD' + parseFloat(response.selling_price).toFixed(2));
                     } else {
                         $('#selling_price_display').text('N/A');
-                    }
-
-                    if (response.selling_price_for_user) {
-                        $('#selling_price_for_user_display').text(' + parseFloat(response.selling_price_for_user).toFixed(2));
-                    } else {
-                        $('#selling_price_for_user_display').text('N/A');
                     }
                 },
                 error: function() {
                     $('#selling_price_display').text('N/A');
-                    $('#selling_price_for_user_display').text('N/A');
                 }
             });
         @else
             // Initialize the display with N/A
             $('#selling_price_display').text('N/A');
-            $('#selling_price_for_user_display').text('N/A');
         @endif
     });
 </script>
 @endpush
-@endsection
