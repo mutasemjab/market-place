@@ -19,7 +19,7 @@ class Product extends Model
         'best_selling' => 'boolean',
     ];
 
-    protected $hidden = ['name_en', 'name_ar', ];
+   // protected $hidden = ['name_en', 'name_ar', ];
     protected $appends = ['name','description'];
 
 
