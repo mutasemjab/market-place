@@ -11,6 +11,7 @@ use App\Models\UserAddress;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\OrderProduct;
+use App\Models\PointTransaction;
 use App\Models\Shop;
 
 
@@ -46,10 +47,7 @@ class OrderController extends Controller
         ], 200);
     }
 
-    /**
-     * Store a newly created order from cart
-     */
-    public function store(Request $request)
+   public function store(Request $request)
     {
         $request->validate([
             'address_id' => 'required|exists:user_addresses,id',
@@ -110,6 +108,13 @@ class OrderController extends Controller
 
             // Calculate order totals
             $orderCalculation = $this->calculateOrderTotals($cartItems, $user->id);
+
+            // Calculate total points for this order
+            $totalOrderPoints = 0;
+            foreach ($cartItems as $cartItem) {
+                $productPoints = $cartItem->product->points ?? 0;
+                $totalOrderPoints += ($productPoints * $cartItem->quantity);
+            }
 
             // Generate order number
             $orderNumber = $this->generateOrderNumber();
@@ -193,6 +198,21 @@ class OrderController extends Controller
                 }
             }
 
+            // Add points transaction and update user points (only if points > 0)
+            if ($totalOrderPoints > 0) {
+                // Create point transaction record
+                PointTransaction::create([
+                    'user_id' => $user->id,
+                    'admin_id' => null,
+                    'points' => $totalOrderPoints,
+                    'type_of_transaction' => 1, // 1 = add points
+                    'note' => "Points earned from order #{$orderNumber}",
+                ]);
+
+                // Update user's total points
+                $user->increment('total_points', $totalOrderPoints);
+            }
+
             // Clear the cart
             $this->clearUserCart($user->id);
 
@@ -207,10 +227,16 @@ class OrderController extends Controller
 
             DB::commit();
 
+            $responseMessage = 'Order created successfully.';
+            if ($totalOrderPoints > 0) {
+                $responseMessage .= " You earned {$totalOrderPoints} points!";
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => $order,
-                'message' => 'Order created successfully.'
+                'points_earned' => $totalOrderPoints,
+                'message' => $responseMessage
             ], 200);
 
         } catch (\Exception $e) {

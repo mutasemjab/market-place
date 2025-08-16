@@ -91,12 +91,27 @@
                                     <label for="selling_price">Selling Price <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <div class="input-group-prepend">
-                                            <span class="input-group-text">$</span>
+                                            <span class="input-group-text">JD</span>
                                         </div>
                                         <input type="number" name="selling_price" id="selling_price" 
                                                class="form-control @error('selling_price') is-invalid @enderror" 
-                                               value="{{ old('selling_price') }}" step="0.01" min="0" required>
+                                               value="{{ old('selling_price') }}" step="any" min="0" required>
                                         @error('selling_price')
+                                            <span class="invalid-feedback">{{ $message }}</span>
+                                        @enderror
+                                    </div>
+                                </div>
+                              
+                                <div class="form-group">
+                                    <label for="selling_price">Points <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend">
+                                            <span class="input-group-text">JD</span>
+                                        </div>
+                                        <input type="number" name="points" id="points" 
+                                               class="form-control @error('points') is-invalid @enderror" 
+                                               value="{{ old('points') }}" step="any" min="0" required>
+                                        @error('points')
                                             <span class="invalid-feedback">{{ $message }}</span>
                                         @enderror
                                     </div>
@@ -108,7 +123,7 @@
                                             <label for="tax">Tax (%)</label>
                                             <input type="number" name="tax" id="tax" 
                                                    class="form-control @error('tax') is-invalid @enderror" 
-                                                   value="{{ old('tax', 16) }}" step="0.01" min="0" max="100">
+                                                   value="{{ old('tax', 16) }}" step="any" min="0" max="100">
                                             @error('tax')
                                                 <span class="invalid-feedback">{{ $message }}</span>
                                             @enderror
@@ -221,7 +236,7 @@
                                         </div>
                                         <div class="col-md-5">
                                             <input type="number" name="variation_prices[]" 
-                                                   class="form-control" placeholder="Price" step="0.01" min="0">
+                                                   class="form-control" placeholder="Price" step="any" min="0">
                                         </div>
                                         <div class="col-md-2">
                                             <button type="button" class="btn btn-success add-variation">
@@ -266,7 +281,7 @@ $(document).ready(function() {
                 </div>
                 <div class="col-md-5">
                     <input type="number" name="variation_prices[]" 
-                           class="form-control" placeholder="Price" step="0.01" min="0">
+                           class="form-control" placeholder="Price" step="any" min="0">
                 </div>
                 <div class="col-md-2">
                     <button type="button" class="btn btn-danger remove-variation">

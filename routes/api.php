@@ -60,7 +60,7 @@ Route::group(['prefix' => 'v1/user'], function () {
     Route::group(['middleware' => ['auth:user-api']], function () {
 
         Route::get('/active', [AuthController::class, 'active']);
-
+         Route::get('/points', [PointsController::class, 'index']); 
 
         Route::post('/update_profile', [AuthController::class, 'updateProfile']);
         Route::post('/delete_account', [AuthController::class, 'deleteAccount']);
