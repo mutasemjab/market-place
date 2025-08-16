@@ -237,7 +237,7 @@ class ProductController extends Controller
             'variations',
             'offers' => function ($query) {
                 $query->whereDate('expired_at', '>', now())
-                    ->orderBy('discount_percentage', 'desc'); // Order offers by discount percentage
+                    ->orderBy('created_at', 'desc'); // Order offers by discount percentage
             },
             'category'
         ])
@@ -285,19 +285,6 @@ class ProductController extends Controller
                     ->favourites()
                     ->where('product_id', $product->id)
                     ->exists();
-            }
-
-            // Add offer summary (best offer details)
-            if ($product->offers->isNotEmpty()) {
-                $bestOffer = $product->offers->sortByDesc('discount_percentage')->first();
-                $product->best_offer = [
-                    'id' => $bestOffer->id,
-                    'discount_percentage' => $bestOffer->discount_percentage,
-                    'discount_amount' => $bestOffer->discount_amount ?? null,
-                    'final_price' => $product->selling_price - ($product->selling_price * $bestOffer->discount_percentage / 100),
-                    'expires_at' => $bestOffer->expired_at,
-                    'expires_in_days' => now()->diffInDays($bestOffer->expired_at),
-                ];
             }
 
             return $product;
